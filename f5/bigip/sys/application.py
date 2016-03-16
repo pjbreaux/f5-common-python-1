@@ -94,7 +94,7 @@ class Service(Resource):
         self._meta_data['required_creation_parameters'].update(
             ('template', 'partition')
         )
-        self._meta_data['required_refresh_parameters'].update(('partition',))
+        self._meta_data['required_load_parameters'].update(('partition',))
         self._meta_data['required_json_kind'] =\
             'tm:sys:application:service:servicestate'
 
@@ -119,10 +119,12 @@ class Service(Resource):
             # drop in Common as the partition in kwargs.
             if 'partition' not in kwargs:
                 kwargs['partition'] = 'Common'
-            # 'template' kwarg should not be used in the call to load becuase
-            # the BigIP will return an error if it's present
-            kwargs.pop('template')
-
+            # Pop all but the necessary load kwargs from the kwargs given to
+            # create. Otherwise, load may fail.
+            kwargs_copy = kwargs.copy()
+            for key in kwargs_copy:
+                if key not in self._meta_data['required_load_parameters']:
+                    kwargs.pop(key)
             # If response was created successfully, do a local_update.
             # If not, call to overridden _load method via load
             self.load(**kwargs)
@@ -238,6 +240,6 @@ class Template(Resource):
     def __init__(self, template_s):
         super(Template, self).__init__(template_s)
         self._meta_data['required_creation_parameters'].update(('partition',))
-        self._meta_data['required_refresh_parameters'].update(('partition',))
+        self._meta_data['required_load_parameters'].update(('partition',))
         self._meta_data['required_json_kind'] =\
             'tm:sys:application:template:templatestate'
