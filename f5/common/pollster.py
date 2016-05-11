@@ -22,7 +22,7 @@ class MaximumAttemptsReached(Exception):
     pass
 
 
-def poll_by_method(method, attempts=30, interval=2):
+def poll_by_method(method, attempts=30, interval=5):
     '''Poll with a given method for a specified number of times.
 
     :param method: callable to invoke in loop -- if no exception is raised

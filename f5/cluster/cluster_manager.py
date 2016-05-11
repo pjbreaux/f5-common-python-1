@@ -46,18 +46,18 @@ class ClusterManager(DeviceMixin):
         :param cluster_type: str -- type of cluster configuration
         '''
 
-        if len(bigips) > 8:
-            raise ClusterNotSupported(
-                'The number of devices to cluster is not supported.'
-            )
+        if len(bigips) < 2 or len(bigips) > 8:
+            msg = 'The number of devices to cluster is not supported.'
+            raise ClusterNotSupported(msg)
+        elif cluster_type not in self.available_cluster_types:
+            msg = 'Unsupported cluster type was given: %s' % cluster_type
+            raise ClusterNotSupported(msg)
+
         self.bigips = bigips[:]
         self.root_bigip = bigips[0]
         self.peers = bigips[1:]
         self.cluster_name = cluster_name
         self.partition = partition
-        if cluster_type not in self.available_cluster_types:
-            msg = 'Unsupported cluster type was given: %s' % cluster_type
-            raise ClusterNotSupported(msg)
         self.cluster_type = cluster_type
         self.dgm = dgm(
             cluster_name, self.root_bigip, bigips[:], partition, cluster_type
@@ -68,7 +68,7 @@ class ClusterManager(DeviceMixin):
         '''Create a cluster of BigIP devices.'''
 
         print('Checking state of devices to be clustered...')
-        self.dgm.ensure_devices_active_licensed()
+        self.dgm.check_devices_active_licensed()
         print('Adding trusted peers to root BigIP...')
         self.peer_mgr.add_trusted_peers(self.root_bigip, self.peers)
         print('Creating device group...')
@@ -111,8 +111,7 @@ class ClusterManager(DeviceMixin):
         bigip_name = self.get_device_info(bigip).name
         root_name = self.get_device_info(self.root_bigip).name
         if bigip_name == root_name:
-            msg = 'Attempting to remove trusted root bigip from cluster. ' \
-                'This is not currently supported.'
+            msg = 'Removing trusted root device is not currently supported.'
             raise RootRemovalNotSupported(msg)
         self.dgm.scale_down_device_group(bigip)
         self.peer_mgr.remove_trusted_peers(self.root_bigip, bigip)

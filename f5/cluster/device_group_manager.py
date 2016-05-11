@@ -50,7 +50,7 @@ class DeviceGroupManager(DeviceMixin):
     def create_device_group(self):
         '''Create the device service cluster group and add devices to it.'''
 
-        self._all_devices_in_sync()
+        self._check_all_devices_in_sync()
         dg = self.root_device.cm.device_groups.device_group
         dg.create(
             name=self.device_group_name,
@@ -67,7 +67,7 @@ class DeviceGroupManager(DeviceMixin):
         if self.device_group_type == 'sync-failover':
             self._ensure_active_standby()
         elif self.device_group_type == 'sync-only':
-            self.ensure_devices_active_licensed()
+            self.check_devices_active_licensed()
         self._ensure_all_devices_in_sync()
 
     def scale_up_device_group(self, device):
@@ -109,23 +109,12 @@ class DeviceGroupManager(DeviceMixin):
         for device in self.devices:
             self._delete_device_from_device_group(device)
             self._ensure_device_active(device)
-        dg = self.root_device.cm.device_groups.device_group.load(
-            name=self.device_group_name, partition=self.partition
-        )
+        dg = self._get_device_group(self.root_device)
         dg.delete()
-        self.ensure_devices_active_licensed()
-        self._all_devices_in_sync()
-        '''
-        for device in self.devices:
-            try:
-                dg = self._get_device_group(device)
-            except Exception:
-                continue
-            else:
-                dg.delete()
-        '''
-        self.ensure_devices_active_licensed()
-        self._all_devices_in_sync()
+        self.check_devices_active_licensed()
+        self._check_all_devices_in_sync()
+        self.check_devices_active_licensed()
+        self._check_all_devices_in_sync()
 
     def _get_device_group(self, device):
         '''Get the device group through a device.
@@ -134,10 +123,21 @@ class DeviceGroupManager(DeviceMixin):
         :returns: tm.cm.device_groups.device_group object
         '''
 
-        device_group = device.cm.device_groups.device_group.load(
+        return device.cm.device_groups.device_group.load(
             name=self.device_group_name, partition=self.partition
         )
-        return device_group
+
+    @pollster.poll_by_method
+    def check_devices_active_licensed(self):
+        '''All devices should be in an active/licensed state.
+
+        :raises: UnexpectedClusterState
+        '''
+
+        if len(self._get_devices_by_activation_state('active')) != \
+                len(self.devices):
+            msg = 'One or more devices was not in a active/licensed state.'
+            raise UnexpectedClusterState(msg)
 
     @pollster.poll_by_method
     def _add_device_to_device_group(self, device):
@@ -176,9 +176,7 @@ class DeviceGroupManager(DeviceMixin):
         '''
 
         device_info = self.get_device_info(device)
-        dg = device.cm.device_groups.device_group.load(
-            name=self.device_group_name, partition=self.partition
-        )
+        dg = self._get_device_group(device)
         device_device = dg.devices_s.devices.load(
             name=device_info.name, partition=self.partition
         )
@@ -198,9 +196,8 @@ class DeviceGroupManager(DeviceMixin):
             partition=self.partition
         )
         if act.failoverState != 'active':
-            raise UnexpectedClusterState(
-                'A device in the cluster was not in the Active state.'
-            )
+            msg = "A device in teh cluster was not in the 'Active' statue."
+            raise UnexpectedClusterState(msg)
 
     def _sync_to_group(self, device):
         '''Sync the device to the cluster group
@@ -215,34 +212,20 @@ class DeviceGroupManager(DeviceMixin):
         """Ensure cluster is in active standby configuration."""
 
         self._sync_to_group(self.root_device)
-        self._devices_in_standby()
+        self._check_devices_in_standby()
         if not self._get_devices_by_activation_state('active'):
-            raise UnexpectedClusterState(
-                'Expected one device to be active in this cluster.'
-            )
-        self._all_devices_in_sync()
+            msg = 'Expected one device to be active in this cluster.'
+            raise UnexpectedClusterState(msg)
+        self._check_all_devices_in_sync()
 
     def _ensure_all_devices_in_sync(self):
         """Ensure all devices have 'In Sync' status are sync is done."""
 
         self._sync_to_group(self.root_device)
-        self._all_devices_in_sync()
+        self._check_all_devices_in_sync()
 
     @pollster.poll_by_method
-    def ensure_devices_active_licensed(self):
-        '''All devices should be in an active/licensed state.
-
-        :raises: UnexpectedClusterState
-        '''
-
-        if len(self._get_devices_by_activation_state('active')) != \
-                len(self.devices):
-            raise UnexpectedClusterState(
-                'One or more BigIP devices was not in a active/licensed state.'
-            )
-
-    @pollster.poll_by_method
-    def _all_devices_in_sync(self):
+    def _check_all_devices_in_sync(self):
         '''Wait until all devices have failover status of 'In Sync'.
 
         :raises: UnexpectedClusterState
@@ -250,12 +233,11 @@ class DeviceGroupManager(DeviceMixin):
 
         if len(self._get_devices_by_failover_status('In Sync')) != \
                 len(self.devices):
-            raise UnexpectedClusterState(
-                "Expected all devices in cluster to have 'In Sync' status."
-            )
+            msg = "Expected all devices in cluster to have 'In Sync' status."
+            raise UnexpectedClusterState(msg)
 
     @pollster.poll_by_method
-    def _devices_in_standby(self):
+    def _check_devices_in_standby(self):
         '''Wait until n-1 devices in 'standby' activation state.
 
         :raises: UnexpectedClusterState
@@ -265,9 +247,8 @@ class DeviceGroupManager(DeviceMixin):
         standby_bigips = \
             self._get_devices_by_activation_state('standby')
         if len(standby_bigips) != (len(self.devices)-1):
-            raise UnexpectedClusterState(
-                'Expected n-1 devices to be in standby state'
-            )
+            msg = 'Expected n-1 devices to be in standby state'
+            raise UnexpectedClusterState(msg)
         return standby_bigips
 
     def _get_devices_by_failover_status(self, status):

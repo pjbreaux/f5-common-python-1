@@ -1,12 +1,12 @@
 bigip1:
-    netloc: <bigip1_ip>
-    username: <un>
-    password: <pw>
+    netloc: 10.190.20.202
+    username: admin
+    password: admin
 bigip2:
-    netloc: <bigip2_ip>
-    username: <un>
-    password: <pw>
+    netloc: 10.190.20.203
+    username: admin
+    password: admin
 bigip3:
-    netloc: <bigip3_ip>
-    username: <un>
-    password: <pw>
+    netloc: 10.190.20.204
+    username: admin
+    password: admin

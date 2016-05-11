@@ -81,3 +81,15 @@ def itest_sync_only_cluster_management(BigIPSetup):
     dg.check_device_group_status()
 
     cm.teardown_cluster()
+
+
+def test_teardown_existing_cluster(BigIPSetup):
+    a, b, c = BigIPSetup
+    bigip_list = [a, b, c]
+    cm = ClusterManager(
+        bigip_list, DEVICE_GROUP_NAME, PARTITION, 'sync-failover')
+    cm.create_cluster()
+    del cm
+    cm = ClusterManager(
+        bigip_list, DEVICE_GROUP_NAME, PARTITION, 'sync-failover')
+    cm.teardown_cluster()
