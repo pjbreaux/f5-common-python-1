@@ -18,7 +18,7 @@ from f5.bigip.mixins import DeviceMixin
 from f5.common import pollster
 
 
-class ClusterGroupNotSynced(Exception):
+class DeviceGroupOperationNotSupported(Exception):
     pass
 
 
@@ -76,6 +76,11 @@ class DeviceGroupManager(DeviceMixin):
         :param device: bigip object -- device to add to device group
         '''
 
+        device_info = self.get_device_info(device)
+        if device_info.name in self._get_device_names_in_group():
+            msg = 'The following device is already member of device group %s' \
+                % device_info.name
+            raise DeviceGroupOperationNotSupported(msg)
         self._add_device_to_device_group(device)
         device.tm.sys.config.save()
         self.devices.append(device)
@@ -87,6 +92,11 @@ class DeviceGroupManager(DeviceMixin):
         :param device: bigip object -- device to delete from device group
         '''
 
+        device_info = self.get_device_info(device)
+        if device_info.name not in self._get_device_names_in_group():
+            msg = 'The following device is not a member of the device group: ' \
+                % device_info.name
+            raise DeviceGroupOperationNotSupported(msg)
         self._delete_device_from_device_group(device)
         device.tm.sys.config.save()
         self.devices.remove(device)
@@ -116,6 +126,19 @@ class DeviceGroupManager(DeviceMixin):
         self._check_all_devices_in_sync()
         self.check_devices_active_licensed()
         self._check_all_devices_in_sync()
+
+    def _get_device_names_in_group(self):
+        """_get_device_names_in_group
+
+        :returns: list -- list of device names in group
+        """
+
+        device_names = []
+        dg = self._get_device_group(self.root_device)
+        members = dg.devices_s.get_collection()
+        for member in members:
+            device_names.append(member.name)
+        return device_names
 
     def _get_device_group(self, device):
         '''Get the device group through a device.
@@ -245,12 +268,12 @@ class DeviceGroupManager(DeviceMixin):
         :returns: list -- devices in standby
         '''
 
-        standby_bigips = \
-            self._get_devices_by_activation_state('standby')
-        if len(standby_bigips) != (len(self.devices)-1):
+        standbys = self._get_devices_by_activation_state('standby')
+        print(len(standbys))
+        if len(standbys) != (len(self.devices)-1):
             msg = 'Expected n-1 devices to be in standby state'
             raise UnexpectedClusterState(msg)
-        return standby_bigips
+        return standbys
 
     def _get_devices_by_failover_status(self, status):
         '''Get a list of bigips by failover status.

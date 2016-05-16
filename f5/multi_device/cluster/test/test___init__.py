@@ -116,13 +116,13 @@ def test_teardown_cluster_synconly(SyncOnlyCluster):
         expected_call_list
 
 
-def test_scale_cluster_up(FailoverCluster):
+def test_scale_up_cluster(FailoverCluster):
     cluster, mock_bigips = FailoverCluster
     cluster.dgm = mock.MagicMock()
     cluster.peer_mgr = mock.MagicMock()
     cluster.create_cluster()
     new_bigip = ManagementRoot('test', 'un', 'pw')
-    cluster.scale_cluster_up(new_bigip)
+    cluster.scale_up_cluster(new_bigip)
     assert len(cluster.bigips) == len(mock_bigips) + 1
     assert cluster.peer_mgr.add_trusted_peers.call_args == \
         mock.call(cluster.root_bigip, [new_bigip])
@@ -130,7 +130,7 @@ def test_scale_cluster_up(FailoverCluster):
     assert cluster.dgm.check_device_group_status.call_args == mock.call()
 
 
-def test_scale_cluster_down(SyncOnlyCluster):
+def test_scale_down_cluster(SyncOnlyCluster):
     cluster, mock_bigips = SyncOnlyCluster
     cluster.dgm = mock.MagicMock()
     cluster.peer_mgr = mock.MagicMock()
@@ -140,7 +140,7 @@ def test_scale_cluster_down(SyncOnlyCluster):
             mock_device_info:
         mock_device_info.side_effect = [
             MockDeviceInfo('root'), MockDeviceInfo('test')]
-        cluster.scale_cluster_down(scale_down_bigip)
+        cluster.scale_down_cluster(scale_down_bigip)
         assert cluster.get_device_info.call_args_list == \
             [mock.call(scale_down_bigip), mock.call(cluster.root_bigip)]
         assert cluster.dgm.scale_down_device_group.call_args == \
@@ -154,24 +154,24 @@ def test_scale_cluster_down(SyncOnlyCluster):
         assert len(cluster.bigips) == len(mock_bigips) - 1
 
 
-def test_scale_cluster_down_not_supported(FailoverClusterTwoBigIPs):
+def test_scale_down_cluster_not_supported(FailoverClusterTwoBigIPs):
     cluster, mock_bigips = FailoverClusterTwoBigIPs
     cluster.dgm = mock.MagicMock()
     cluster.peer_mgr = mock.MagicMock()
     cluster.create_cluster()
     with pytest.raises(ClusterNotSupported) as ex:
-        cluster.scale_cluster_down(mock_bigips[1])
+        cluster.scale_down_cluster(mock_bigips[1])
     assert ex.value.message == \
         'The number of devices to cluster is not supported.'
 
 
-def test_scale_cluster_down_root_removal_not_supported(SyncOnlyCluster):
+def test_scale_down_cluster_root_removal_not_supported(SyncOnlyCluster):
     cluster, mock_bigips = SyncOnlyCluster
     cluster.dgm = mock.MagicMock()
     cluster.peer_mgr = mock.MagicMock()
     cluster.create_cluster()
     with mock.patch('f5.multi_device.cluster.Cluster.get_device_info'):
         with pytest.raises(RootRemovalNotSupported) as ex:
-            cluster.scale_cluster_down(mock_bigips[0])
+            cluster.scale_down_cluster(mock_bigips[0])
         assert ex.value.message == \
             'Removing trusted root device is not currently supported.'

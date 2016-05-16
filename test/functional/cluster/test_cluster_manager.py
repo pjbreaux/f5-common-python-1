@@ -51,14 +51,16 @@ def test_failover_cluster_management(BigIPSetup):
     cm.create_cluster()
     # dg.check_device_group_status()
 
-    cm.scale_cluster_up(c)
+    cm.scale_up_cluster(c)
     bigip_list.append(c)
     # dg.check_device_group_status()
 
-    cm.scale_cluster_down(b)
-    bigip_list.remove(b)
+    cm.scale_down_cluster(c)
+    bigip_list.remove(c)
     # dg.check_device_group_status()
 
+    cm.scale_up_cluster(c)
+    bigip_list.append(c)
     cm.teardown_cluster()
 
 

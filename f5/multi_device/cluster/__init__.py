@@ -82,7 +82,7 @@ class Cluster(DeviceMixin):
         for bigip in self.bigips:
             self.peer_mgr.remove_trusted_peers(bigip)
 
-    def scale_cluster_up(self, bigip):
+    def scale_up_cluster(self, bigip):
         '''Scale cluster up by one device.
 
         :param bigip: bigip object -- bigip to add
@@ -98,7 +98,7 @@ class Cluster(DeviceMixin):
         self.bigips.append(bigip)
         self.dgm.check_device_group_status()
 
-    def scale_cluster_down(self, bigip):
+    def scale_down_cluster(self, bigip):
         '''Scale cluster down by one device.
 
         :param bigip: bigip object -- bigip to delete
