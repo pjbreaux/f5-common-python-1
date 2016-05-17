@@ -15,7 +15,8 @@
 #
 
 from f5.multi_device.cluster.managers import DeviceGroupManager
-# from f5.multi_device.cluster.managers import TrustedPeerManager
+from f5.multi_device.cluster.managers import DeviceGroupOperationNotSupported
+from f5.multi_device.cluster.managers import UnexpectedClusterState
 
 import mock
 import pytest
@@ -55,6 +56,19 @@ def DGMSyncOnly():
     return dgm, root_device, devices
 
 
+@pytest.fixture
+def SyncFailoverScaleUp(DGMSyncFailover):
+    dgm, root_device, devices = DGMSyncFailover
+    # After cluster has been scaled up, ensure one more device in in
+    # standby state
+    dgm._get_devices_by_activation_state = mock.MagicMock(
+        return_value=['one', 'two', 'three'])
+    # And ensure all new devices in sync
+    dgm._get_devices_by_failover_status = mock.MagicMock(
+        return_value=['one', 'two', 'three', 'four'])
+    return dgm, root_device, devices
+
+
 def test___init__(DGMSyncOnly):
     dgm, root_device, devices = DGMSyncOnly
     assert dgm.device_group_name == 'dg_name'
@@ -73,14 +87,41 @@ def test_create_device_group(DGMSyncFailover):
                 name='dg_name', partition='part', type='sync-failover')
 
 
-def test_scale_up_device_group(DGMSyncFailover):
+def test_creat_device_group_sync_only_in_common(DGMSyncOnly):
+    root_device = mock.MagicMock()
+    devices = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock()]
+    with pytest.raises(DeviceGroupOperationNotSupported) as ex:
+        DeviceGroupManager(
+            'dg_name', root_device, devices, 'Common', 'sync-only')
+    assert 'Attemped to create sync-only device group in the Common ' \
+        'partition. This is not supported.' == ex.value.message
+
+
+def test_scale_down_device_group_not_member(SyncFailoverScaleUp):
     new_device = mock.MagicMock()
+    dgm, root_device, devices = SyncFailoverScaleUp
+    dgm.get_device_info = mock.MagicMock(
+        side_effect=['name1', 'name2', 'name3'])
+    with pytest.raises(DeviceGroupOperationNotSupported) as ex:
+        dgm.scale_up_device_group(new_device)
+    assert 'The following device is not a member of the device group:' in \
+        ex.value.message
+
+
+def test_check_devices_active_licensed(DGMSyncFailover):
     dgm, root_device, devices = DGMSyncFailover
-    # After cluster has been scaled up, ensure one more device in in
-    # standby state
-    dgm._get_devices_by_activation_state = mock.MagicMock(
-        return_value=['one', 'two', 'three'])
-    # And ensure all new devices in sync
-    dgm._get_devices_by_failover_status = mock.MagicMock(
-        return_value=['one', 'two', 'three', 'four'])
-    dgm.scale_up_device_group(new_device)
+    act = dgm.check_devices_active_licensed()
+    assert act is None
+
+
+def test_check_devices_active_licensed_unexpected():
+    root_device = mock.MagicMock()
+    devices = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock()]
+    dgm = DeviceGroupManager(
+        'dg_name', root_device, devices, 'part', 'sync-failover')
+    act_state_mock = mock.MagicMock(return_value=['one'])
+    dgm._get_devices_by_activation_state = act_state_mock
+    with pytest.raises(UnexpectedClusterState) as ex:
+        dgm.check_devices_active_licensed()
+    assert ex.value.message == \
+        'One or more devices was not in a active/licensed state.'

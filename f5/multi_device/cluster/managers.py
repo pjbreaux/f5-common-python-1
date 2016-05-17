@@ -46,6 +46,10 @@ class DeviceGroupManager(DeviceMixin):
         self.root_device = root_device
         self.devices = devices[:]
         self.device_group_type = dg_type
+        if dg_type == 'sync-only' and partition == 'Common':
+            msg = 'Attempted to create sync-only device group in the Common ' \
+                'partition. This is not supported.'
+            raise DeviceGroupOperationNotSupported(msg)
 
     def create_device_group(self):
         '''Create the device service cluster group and add devices to it.'''
@@ -78,8 +82,8 @@ class DeviceGroupManager(DeviceMixin):
 
         device_info = self.get_device_info(device)
         if device_info.name in self._get_device_names_in_group():
-            msg = 'The following device is already member of device group %s' \
-                % device_info.name
+            msg = 'The following device is already a member of the device ' \
+                'group: %s' % device_info.name
             raise DeviceGroupOperationNotSupported(msg)
         self._add_device_to_device_group(device)
         device.tm.sys.config.save()
@@ -220,7 +224,7 @@ class DeviceGroupManager(DeviceMixin):
             partition=self.partition
         )
         if act.failoverState != 'active':
-            msg = "A device in teh cluster was not in the 'Active' statue."
+            msg = "A device in the cluster was not in the 'Active' state."
             raise UnexpectedClusterState(msg)
 
     def _sync_to_group(self, device):
@@ -269,7 +273,6 @@ class DeviceGroupManager(DeviceMixin):
         '''
 
         standbys = self._get_devices_by_activation_state('standby')
-        print(len(standbys))
         if len(standbys) != (len(self.devices)-1):
             msg = 'Expected n-1 devices to be in standby state'
             raise UnexpectedClusterState(msg)
