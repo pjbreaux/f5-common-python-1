@@ -90,6 +90,8 @@ class TrustDomain(object):
         self.partition = kwargs['partition']
         for device in self.devices[1:]:
             self._add_trustee(device)
+        config_sync_cmd = 'config-sync to-group device_trust_group' % self.name
+        device.tm.cm.exec_cmd('run', utilCmdArgs=config_sync_cmd)
         pollster(self.validate)()
 
     def teardown(self):
