@@ -1,4 +1,4 @@
-# Copyright 2016 F5 Networks Inc.
+# Copyright 2015 F5 Networks Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,22 +16,25 @@
 import mock
 import pytest
 
+from f5.bigip import ManagementRoot
 from f5.bigip.resource import MissingRequiredCreationParameter
-from f5.bigip.tm.sys.folder import Folders
+from f5.bigip.tm.ltm.ifile import Ifile
 
 
 @pytest.fixture
-def FakeFolders():
-    fake_sys = mock.MagicMock()
-    folders = Folders(fake_sys)
-    folders._meta_data['bigip'].tmos_version = '11.6.0'
-    return folders
+def FakeIfile():
+    fake_ifile_s = mock.MagicMock()
+    fake_ifile = Ifile(fake_ifile_s)
+    return fake_ifile
 
 
-class TestFolder(object):
-    def test_missing_create_args(self):
-        folders = FakeFolders()
-        folder = folders.folder
-        with pytest.raises(MissingRequiredCreationParameter) as ex:
-            folder.create(name='test_folder')
-            assert 'subPath' in ex.value.message
+class TestCreate(object):
+    def test_create_two(self, fakeicontrolsession):
+        mgmt = ManagementRoot('172.16.44.15', 'admin', 'admin')
+        r1 = mgmt.tm.ltm.ifiles.ifile
+        r2 = mgmt.tm.ltm.ifiles.ifile
+        assert r1 is not r2
+
+    def test_create_no_args(self, FakeIfile):
+        with pytest.raises(MissingRequiredCreationParameter):
+            FakeIfile.create()
